@@ -34,30 +34,45 @@ function App() {
     setSearchResults([])
     
     try {
-      const { text } = await blink.ai.generateText({
-        prompt: `Search for travel destinations matching "${query}". Return a JSON array of 6 places with this exact structure:
-        [
-          {
-            "id": "unique_id",
-            "name": "Place Name",
-            "description": "Brief description of the place",
-            "location": {
-              "lat": 0,
-              "lng": 0,
-              "address": "Full address"
-            },
-            "photos": ["https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800", "https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=800"],
-            "rating": 4.5,
-            "category": "City/Beach/Mountain/Historic/etc"
-          }
-        ]
-        
-        Use real Unsplash photo URLs that match each destination. Make the descriptions engaging and informative.`,
+      const { object } = await blink.ai.generateObject({
+        prompt: `Search for travel destinations matching "${query}". Generate 6 diverse and interesting places that match the search query. Use real Unsplash photo URLs that match each destination. Make the descriptions engaging and informative.`,
+        schema: {
+          type: 'object',
+          properties: {
+            places: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  id: { type: 'string' },
+                  name: { type: 'string' },
+                  description: { type: 'string' },
+                  location: {
+                    type: 'object',
+                    properties: {
+                      lat: { type: 'number' },
+                      lng: { type: 'number' },
+                      address: { type: 'string' }
+                    },
+                    required: ['lat', 'lng', 'address']
+                  },
+                  photos: {
+                    type: 'array',
+                    items: { type: 'string' }
+                  },
+                  rating: { type: 'number' },
+                  category: { type: 'string' }
+                },
+                required: ['id', 'name', 'description', 'location', 'photos', 'rating', 'category']
+              }
+            }
+          },
+          required: ['places']
+        },
         model: 'gpt-4o-mini'
       })
       
-      const places = JSON.parse(text)
-      setSearchResults(places)
+      setSearchResults(object.places)
     } catch (error) {
       console.error('Search error:', error)
       // Fallback mock data
@@ -91,58 +106,98 @@ function App() {
     try {
       // Generate attractions, food recommendations, and trip plan in parallel
       const [attractionsResponse, foodResponse, tripPlanResponse] = await Promise.all([
-        blink.ai.generateText({
-          prompt: `Generate 6 nearby attractions for ${place.name}. Return JSON array:
-          [
-            {
-              "id": "unique_id",
-              "name": "Attraction Name",
-              "description": "Brief description",
-              "distance": "0.5 km",
-              "rating": 4.5,
-              "photo": "https://images.unsplash.com/photo-relevant?w=400",
-              "category": "Museum/Park/Historic/etc"
-            }
-          ]`,
-          model: 'gpt-4o-mini'
-        }),
-        blink.ai.generateText({
-          prompt: `Generate 4 food recommendations for ${place.name}. Return JSON array:
-          [
-            {
-              "id": "unique_id",
-              "name": "Restaurant Name",
-              "cuisine": "Cuisine Type",
-              "description": "Brief description",
-              "rating": 4.5,
-              "priceRange": "$$",
-              "photo": "https://images.unsplash.com/photo-food?w=400",
-              "distance": "0.3 km"
-            }
-          ]`,
-          model: 'gpt-4o-mini'
-        }),
-        blink.ai.generateText({
-          prompt: `Create a detailed trip plan for ${place.name}. Return JSON:
-          {
-            "destination": "${place.name}",
-            "duration": "3-4 days",
-            "highlights": ["highlight1", "highlight2", "highlight3"],
-            "itinerary": [
-              {
-                "day": 1,
-                "activities": ["activity1", "activity2", "activity3"]
+        blink.ai.generateObject({
+          prompt: `Generate 6 nearby attractions for ${place.name}. Include diverse types like museums, parks, historic sites, viewpoints, etc. Use real Unsplash photo URLs that match each attraction.`,
+          schema: {
+            type: 'object',
+            properties: {
+              attractions: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                    name: { type: 'string' },
+                    description: { type: 'string' },
+                    distance: { type: 'string' },
+                    rating: { type: 'number' },
+                    photo: { type: 'string' },
+                    category: { type: 'string' }
+                  },
+                  required: ['id', 'name', 'description', 'distance', 'rating', 'photo', 'category']
+                }
               }
-            ],
-            "tips": ["tip1", "tip2", "tip3"]
-          }`,
+            },
+            required: ['attractions']
+          },
+          model: 'gpt-4o-mini'
+        }),
+        blink.ai.generateObject({
+          prompt: `Generate 4 food recommendations for ${place.name}. Include diverse cuisine types and price ranges. Use real Unsplash food/restaurant photo URLs.`,
+          schema: {
+            type: 'object',
+            properties: {
+              restaurants: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                    name: { type: 'string' },
+                    cuisine: { type: 'string' },
+                    description: { type: 'string' },
+                    rating: { type: 'number' },
+                    priceRange: { type: 'string' },
+                    photo: { type: 'string' },
+                    distance: { type: 'string' }
+                  },
+                  required: ['id', 'name', 'cuisine', 'description', 'rating', 'priceRange', 'photo', 'distance']
+                }
+              }
+            },
+            required: ['restaurants']
+          },
+          model: 'gpt-4o-mini'
+        }),
+        blink.ai.generateObject({
+          prompt: `Create a detailed trip plan for ${place.name}. Include a realistic duration, key highlights, day-by-day itinerary, and practical travel tips.`,
+          schema: {
+            type: 'object',
+            properties: {
+              destination: { type: 'string' },
+              duration: { type: 'string' },
+              highlights: {
+                type: 'array',
+                items: { type: 'string' }
+              },
+              itinerary: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    day: { type: 'number' },
+                    activities: {
+                      type: 'array',
+                      items: { type: 'string' }
+                    }
+                  },
+                  required: ['day', 'activities']
+                }
+              },
+              tips: {
+                type: 'array',
+                items: { type: 'string' }
+              }
+            },
+            required: ['destination', 'duration', 'highlights', 'itinerary', 'tips']
+          },
           model: 'gpt-4o-mini'
         })
       ])
 
-      setAttractions(JSON.parse(attractionsResponse.text))
-      setFoodRecommendations(JSON.parse(foodResponse.text))
-      setTripPlan(JSON.parse(tripPlanResponse.text))
+      setAttractions(attractionsResponse.object.attractions)
+      setFoodRecommendations(foodResponse.object.restaurants)
+      setTripPlan(tripPlanResponse.object)
     } catch (error) {
       console.error('Details error:', error)
       // Fallback mock data
